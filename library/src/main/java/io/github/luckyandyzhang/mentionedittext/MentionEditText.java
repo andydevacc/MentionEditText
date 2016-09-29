@@ -20,6 +20,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.support.v7.widget.AppCompatEditText;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.Spannable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -186,6 +187,8 @@ public class MentionEditText extends AppCompatEditText {
         mRangeArrayList = new ArrayList<>(5);
         mPattern = Pattern.compile(DEFAULT_MENTION_PATTERN);
         mMentionTextColor = Color.RED;
+        //disable suggestion
+        setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         addTextChangedListener(new MentionTextWatcher());
     }
 
