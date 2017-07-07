@@ -405,7 +405,7 @@ public class MentionEditText extends AppCompatEditText {
     /**
      * Listener for '@' character
      */
-    interface OnMentionInputListener {
+    public interface OnMentionInputListener {
         /**
          * call when '@' character is inserted into EditText
          */
