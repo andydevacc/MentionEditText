@@ -135,7 +135,7 @@ public class MentionEditText extends AppCompatEditText {
     }
 
     /**
-     * set regularExpression
+     * set regularExpression by tag
      *
      * @param pattern regularExpression
      */
@@ -145,8 +145,9 @@ public class MentionEditText extends AppCompatEditText {
     }
 
     /**
-     * @param tag
-     * @param pattern
+     * add regularExpression by tag
+     * @param tag   set tag for regularExpression
+     * @param pattern   regularExpression
      */
     public void addPattern(String tag, String pattern) {
         mPatternMap.put(tag, Pattern.compile(pattern));
@@ -184,6 +185,37 @@ public class MentionEditText extends AppCompatEditText {
                 if (!mentionList.contains(mentionText)) {
                     mentionList.add(mentionText);
                 }
+            }
+        }
+        return mentionList;
+    }
+
+    /**
+     * get a list of mention string by tag
+     *
+     * @param excludeMentionCharacter if true, return mention string with format like 'Andy' instead of "@Andy"
+     * @return list of mention string
+     */
+    public List<String> getMentionList(String tag, boolean excludeMentionCharacter) {
+        List<String> mentionList = new ArrayList<>();
+        if (TextUtils.isEmpty(getText().toString())) {
+            return mentionList;
+        }
+        for (Map.Entry<String, Pattern> entry : mPatternMap.entrySet()) {
+            if (entry.getKey().equals(tag)){
+                Matcher matcher = entry.getValue().matcher(getText().toString());
+                while (matcher.find()) {
+                    String mentionText = matcher.group();
+                    //tailor the mention string, using the format likes 'Andy' instead of "@Andy"
+                    if (excludeMentionCharacter) {
+                        //careful! 'Andy#' will be the result of '#Andy#' here
+                        mentionText = mentionText.substring(1);
+                    }
+                    if (!mentionList.contains(mentionText)) {
+                        mentionList.add(mentionText);
+                    }
+                }
+                break;
             }
         }
         return mentionList;
@@ -299,7 +331,7 @@ public class MentionEditText extends AppCompatEditText {
     private class HackInputConnection extends InputConnectionWrapper {
         private EditText editText;
 
-        public HackInputConnection(InputConnection target, boolean mutable, MentionEditText editText) {
+        HackInputConnection(InputConnection target, boolean mutable, MentionEditText editText) {
             super(target, mutable);
             this.editText = editText;
         }
@@ -344,24 +376,24 @@ public class MentionEditText extends AppCompatEditText {
         int from;
         int to;
 
-        public Range(int from, int to) {
+        Range(int from, int to) {
             this.from = from;
             this.to = to;
         }
 
-        public boolean isWrappedBy(int start, int end) {
+        boolean isWrappedBy(int start, int end) {
             return (start > from && start < to) || (end > from && end < to);
         }
 
-        public boolean contains(int start, int end) {
+        boolean contains(int start, int end) {
             return from <= start && to >= end;
         }
 
-        public boolean isEqual(int start, int end) {
+        boolean isEqual(int start, int end) {
             return (from == start && to == end) || (from == end && to == start);
         }
 
-        public int getAnchorPosition(int value) {
+        int getAnchorPosition(int value) {
             if ((value - from) - (to - value) >= 0) {
                 return to;
             } else {
@@ -373,7 +405,7 @@ public class MentionEditText extends AppCompatEditText {
     /**
      * Listener for '@' character
      */
-    public interface OnMentionInputListener {
+    interface OnMentionInputListener {
         /**
          * call when '@' character is inserted into EditText
          */
