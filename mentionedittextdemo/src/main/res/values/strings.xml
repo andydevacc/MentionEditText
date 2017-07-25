@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">MentionEditTextDemo</string>
+    <string name="addmentiontext">add MentionText</string>
+    <string name="printmentiontext">print MentionText</string>
+    <string name="autoformat">autoformat</string>
+</resources>

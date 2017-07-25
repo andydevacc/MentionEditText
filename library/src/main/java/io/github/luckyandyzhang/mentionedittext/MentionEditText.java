@@ -17,13 +17,13 @@
 package io.github.luckyandyzhang.mentionedittext;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.support.v7.widget.AppCompatEditText;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -33,7 +33,9 @@ import android.view.inputmethod.InputConnectionWrapper;
 import android.widget.EditText;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -54,6 +56,7 @@ public class MentionEditText extends AppCompatEditText {
     private Runnable mAction;
 
     private int mMentionTextColor;
+    private boolean mAutoFormat;
 
     private boolean mIsSelected;
     private Range mLastSelectedRange;
@@ -61,19 +64,14 @@ public class MentionEditText extends AppCompatEditText {
 
     private OnMentionInputListener mOnMentionInputListener;
 
-    public MentionEditText(Context context) {
-        super(context);
-        init();
-    }
-
     public MentionEditText(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init();
+        init(attrs);
     }
 
     public MentionEditText(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init();
+        init(attrs);
     }
 
     @Override
@@ -98,7 +96,22 @@ public class MentionEditText extends AppCompatEditText {
 
     @Override
     protected void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
-        colorMentionString();
+        if (lengthAfter == 1 && !TextUtils.isEmpty(text)) {
+            char mentionChar = text.toString().charAt(start);
+            String mentionString = String.valueOf(mentionChar);
+            for (String tag : mPatternMap.keySet()) {
+                if (tag.equals(mentionString) && mOnMentionInputListener != null) {
+                    mOnMentionInputListener.onMentionCharacterInput(tag);
+                    return;
+                }
+            }
+        }
+
+        if (mAutoFormat) {
+            colorMentionString();
+        } else {
+            mentionTextChanged(start, lengthBefore, lengthAfter);
+        }
     }
 
     @Override
@@ -134,6 +147,23 @@ public class MentionEditText extends AppCompatEditText {
         }
     }
 
+    public void addMentionString(int uid, String name) {
+        addMentionString(uid, name, true);
+    }
+
+    public void addMentionString(int uid, String name, boolean charBefore) {
+        Editable editable = getText();
+        int start = getSelectionStart();
+        int end = start + name.length();
+        editable.insert(start, name + " ");
+        if (charBefore) {
+            start--;
+        }
+        editable.setSpan(new ForegroundColorSpan(mMentionTextColor), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        mRangeArrayList.add(new Range(uid, name, start, end));
+        setSelection(end + 1);
+    }
+
     /**
      * set regularExpression by tag
      *
@@ -151,6 +181,13 @@ public class MentionEditText extends AppCompatEditText {
      */
     public void addPattern(String tag, String pattern) {
         mPatternMap.put(tag, Pattern.compile(pattern));
+    }
+
+    /**
+     * if autoformat is false, you should call {@link #addMentionString(int, String, boolean)} } to add mentionString
+     */
+    public void setAutoFormat(boolean mAutoFormat) {
+        this.mAutoFormat = mAutoFormat;
     }
 
     /**
@@ -173,19 +210,8 @@ public class MentionEditText extends AppCompatEditText {
         if (TextUtils.isEmpty(getText().toString())) {
             return mentionList;
         }
-        for (Map.Entry<String, Pattern> entry : mPatternMap.entrySet()) {
-            Matcher matcher = entry.getValue().matcher(getText().toString());
-            while (matcher.find()) {
-                String mentionText = matcher.group();
-                //tailor the mention string, using the format likes 'Andy' instead of "@Andy"
-                if (excludeMentionCharacter) {
-                    //careful! 'Andy#' will be the result of '#Andy#' here
-                    mentionText = mentionText.substring(1);
-                }
-                if (!mentionList.contains(mentionText)) {
-                    mentionList.add(mentionText);
-                }
-            }
+        for (String tag : mPatternMap.keySet()) {
+            mentionList.addAll(getMentionList(tag, excludeMentionCharacter));
         }
         return mentionList;
     }
@@ -198,27 +224,47 @@ public class MentionEditText extends AppCompatEditText {
      */
     public List<String> getMentionList(String tag, boolean excludeMentionCharacter) {
         List<String> mentionList = new ArrayList<>();
-        if (TextUtils.isEmpty(getText().toString())) {
+        if (TextUtils.isEmpty(getText().toString()) || !mPatternMap.containsKey(tag)) {
             return mentionList;
         }
-        for (Map.Entry<String, Pattern> entry : mPatternMap.entrySet()) {
-            if (entry.getKey().equals(tag)){
-                Matcher matcher = entry.getValue().matcher(getText().toString());
-                while (matcher.find()) {
-                    String mentionText = matcher.group();
-                    //tailor the mention string, using the format likes 'Andy' instead of "@Andy"
-                    if (excludeMentionCharacter) {
-                        //careful! 'Andy#' will be the result of '#Andy#' here
-                        mentionText = mentionText.substring(1);
-                    }
-                    if (!mentionList.contains(mentionText)) {
-                        mentionList.add(mentionText);
-                    }
-                }
-                break;
+        Pattern pattern = mPatternMap.get(tag);
+        Matcher matcher = pattern.matcher(getText().toString());
+        while (matcher.find()) {
+            String mentionText = matcher.group();
+            //tailor the mention string, using the format likes 'Andy' instead of "@Andy"
+            if (excludeMentionCharacter) {
+                //careful! 'Andy#' will be the result of '#Andy#' here
+                mentionText = mentionText.substring(1);
+            }
+            if (!mentionList.contains(mentionText)) {
+                mentionList.add(mentionText);
             }
         }
         return mentionList;
+    }
+
+    public String formatMentionString(String format) {
+        String text = getText().toString();
+        if (mRangeArrayList.isEmpty()) {
+            return text;
+        }
+
+        StringBuilder builder = new StringBuilder("");
+        int lastRangeTo = 0;
+        //sort by asc
+        Collections.sort(mRangeArrayList);
+
+        for (Range range : mRangeArrayList) {
+            if (range.name == null) {
+                continue;
+            }
+            String newChar = String.format(format, range.id, range.name);
+            builder.append(text.substring(lastRangeTo, range.from));
+            builder.append(newChar);
+            lastRangeTo = range.to;
+        }
+        builder.append(text.substring(lastRangeTo, text.length()));
+        return builder.toString();
     }
 
     /**
@@ -230,13 +276,17 @@ public class MentionEditText extends AppCompatEditText {
         mOnMentionInputListener = onMentionInputListener;
     }
 
-    private void init() {
+    private void init(AttributeSet attrs) {
+        TypedArray typedArray = getContext().obtainStyledAttributes(attrs, R.styleable.MentionEditText);
+        mMentionTextColor = typedArray.getColor(R.styleable.MentionEditText_mentionColor, Color.RED);
+        mAutoFormat = typedArray.getBoolean(R.styleable.MentionEditText_autoformat, false);
+        typedArray.recycle();
+
         mRangeArrayList = new ArrayList<>(5);
         setPattern(DEFAULT_METION_TAG, DEFAULT_MENTION_PATTERN);
         mMentionTextColor = Color.RED;
         //disable suggestion
         setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        addTextChangedListener(new MentionTextWatcher());
     }
 
     private void colorMentionString() {
@@ -279,6 +329,35 @@ public class MentionEditText extends AppCompatEditText {
         }
     }
 
+    /**
+     * rebuild the list
+     */
+    private void mentionTextChanged(int start, int count, int after) {
+        Editable editable = getText();
+        //return if add at the end
+        if (start >= editable.length()) {
+            return;
+        }
+
+        int end = start + count;
+        int offset = after - count;
+
+        //remove unused range
+        //reset the ranges between start and end
+        Iterator<Range> iterator = mRangeArrayList.iterator();
+        while (iterator.hasNext()) {
+            Range range = iterator.next();
+            if (range.isWrapped(start, end)) {
+                iterator.remove();
+                continue;
+            }
+
+            if (range.from >= end) {
+                range.setOffset(offset);
+            }
+        }
+    }
+
     private Range getRangeOfClosestMentionString(int selStart, int selEnd) {
         if (mRangeArrayList == null) {
             return null;
@@ -301,30 +380,6 @@ public class MentionEditText extends AppCompatEditText {
             }
         }
         return null;
-    }
-
-    //text watcher for mention character('@')
-    private class MentionTextWatcher implements TextWatcher {
-        @Override
-        public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-        }
-
-        @Override
-        public void onTextChanged(CharSequence charSequence, int index, int i1, int count) {
-            if (count == 1 && !TextUtils.isEmpty(charSequence)) {
-                char mentionChar = charSequence.toString().charAt(index);
-                for (Map.Entry<String, Pattern> entry : mPatternMap.entrySet()) {
-                    if (entry.getKey().equals(String.valueOf(mentionChar)) && mOnMentionInputListener != null) {
-                        mOnMentionInputListener.onMentionCharacterInput(entry.getKey());
-                        break;
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void afterTextChanged(Editable editable) {
-        }
     }
 
     //handle the deletion action for mention string, such as '@test'
@@ -368,37 +423,6 @@ public class MentionEditText extends AppCompatEditText {
                         && sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
             }
             return super.deleteSurroundingText(beforeLength, afterLength);
-        }
-    }
-
-    //helper class to record the position of mention string in EditText
-    private class Range {
-        int from;
-        int to;
-
-        Range(int from, int to) {
-            this.from = from;
-            this.to = to;
-        }
-
-        boolean isWrappedBy(int start, int end) {
-            return (start > from && start < to) || (end > from && end < to);
-        }
-
-        boolean contains(int start, int end) {
-            return from <= start && to >= end;
-        }
-
-        boolean isEqual(int start, int end) {
-            return (from == start && to == end) || (from == end && to == start);
-        }
-
-        int getAnchorPosition(int value) {
-            if ((value - from) - (to - value) >= 0) {
-                return to;
-            } else {
-                return from;
-            }
         }
     }
 
