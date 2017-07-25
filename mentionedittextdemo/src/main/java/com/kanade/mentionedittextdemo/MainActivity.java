@@ -21,7 +21,7 @@ public class MainActivity extends AppCompatActivity {
     private Button af;
     private TextView textView;
     private int i = 0;
-    private boolean autoformat = false;
+    private boolean autoformat = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,8 +53,8 @@ public class MainActivity extends AppCompatActivity {
         print.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!autoformat) {
-                    String text = met.formatMentionString("[Mention:%s, %s]");
+                if (autoformat) {
+                    String text = met.formatMentionString("[Mention: id: %s, name: %s]");
                     textView.setText(text);
                 } else {
                     List<String> list = met.getMentionList(true);

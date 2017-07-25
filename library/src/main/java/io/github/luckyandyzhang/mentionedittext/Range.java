@@ -8,7 +8,7 @@ import android.support.annotation.NonNull;
  * Created by kanade on 2017/7/25.
  */
 class Range implements Comparable<Range>{
-    int id;
+    long id;
     String name;
     int from;
     int to;
@@ -18,7 +18,7 @@ class Range implements Comparable<Range>{
         this.to = to;
     }
 
-    public Range(int id, String name, int from, int to) {
+    public Range(long id, String name, int from, int to) {
         this.id = id;
         this.name = name;
         this.from = from;

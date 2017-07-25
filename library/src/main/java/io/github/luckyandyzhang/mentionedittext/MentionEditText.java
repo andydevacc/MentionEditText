@@ -147,11 +147,11 @@ public class MentionEditText extends AppCompatEditText {
         }
     }
 
-    public void addMentionString(int uid, String name) {
+    public void addMentionString(long uid, String name) {
         addMentionString(uid, name, true);
     }
 
-    public void addMentionString(int uid, String name, boolean charBefore) {
+    public void addMentionString(long uid, String name, boolean charBefore) {
         Editable editable = getText();
         int start = getSelectionStart();
         int end = start + name.length();
@@ -184,7 +184,7 @@ public class MentionEditText extends AppCompatEditText {
     }
 
     /**
-     * if autoformat is false, you should call {@link #addMentionString(int, String, boolean)} } to add mentionString
+     * if autoformat is false, you should call {@link #addMentionString(long, String, boolean)} to add mention string
      */
     public void setAutoFormat(boolean mAutoFormat) {
         this.mAutoFormat = mAutoFormat;
@@ -249,9 +249,8 @@ public class MentionEditText extends AppCompatEditText {
             return text;
         }
 
-        StringBuilder builder = new StringBuilder("");
+        StringBuilder builder = new StringBuilder();
         int lastRangeTo = 0;
-        //sort by asc
         Collections.sort(mRangeArrayList);
 
         for (Range range : mRangeArrayList) {
