@@ -354,7 +354,7 @@ public class MentionEditText extends AppCompatEditText {
                     //select the mention string
                     mIsSelected = true;
                     mLastSelectedRange = closestRange;
-                    setSelection(closestRange.to, closestRange.from);
+                    setSelection(closestRange.from,closestRange.to);
                 }
                 return true;
             }
